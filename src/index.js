@@ -154,7 +154,7 @@ socket.on("wireguardConfig", writeWireguardConfig)
  * 
  * @param {{
  *   users: Array<typeUser>;
- *   WireguardIpConfig: keys: {Preshared: string;Private: string;Public: string;};ip: {v4: {ip: string;mask: string;};v6: {ip: string;mask: string;};};}
+ *   WireguardIpConfig: {ip: {v4: {ip: string;mask: string;};v6: {ip: string;mask: string;};};keys: {Preshared: string;Private: string;Public: string;};}
  * }} config
  * @returns 
  */
