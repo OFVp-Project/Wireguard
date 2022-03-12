@@ -1,0 +1,26 @@
+#image: ghcr.io/ofvp-project/devcontainer
+tasks:
+  - init: npm install
+ports:
+  - port: 3000
+    visibility: public
+vscode:
+  extensions:
+    - "akamud.vscode-theme-onedark"
+    - "formulahendry.auto-rename-tag"
+    - "hookyqr.beautify"
+    - "aaron-bond.better-comments"
+    - "oouo-diogo-perdigao.docthis"
+    - "dbaeumer.vscode-eslint"
+    - "oderwat.indent-rainbow"
+    - "eg2.vscode-npm-script"
+    - "christian-kohler.npm-intellisense"
+    - "ionutvmi.path-autocomplete"
+    - "christian-kohler.path-intellisense"
+    - "esbenp.prettier-vscode"
+    - "rangav.vscode-thunder-client"
+    - "vscode-icons-team.vscode-icons"
+    - "redhat.vscode-yaml"
+    - "eamodio.gitlens"
+    - "mongodb.mongodb-vscode"
+    - "ms-azuretools.vscode-docker"

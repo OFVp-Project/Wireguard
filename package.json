@@ -2,10 +2,7 @@
   "name": "@ofvp_project/wireguard",
   "version": "4.0.1",
   "description": "One of the project servers, this server to create a vpn using the Wireguard protocol, which works on several devices.",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
+  "main": "src/index.js",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/OFVp-Project/Wireguard.git"
@@ -18,5 +15,8 @@
   "bugs": {
     "url": "https://github.com/OFVp-Project/Wireguard/issues"
   },
-  "homepage": "https://github.com/OFVp-Project/Wireguard#readme"
+  "homepage": "https://github.com/OFVp-Project/Wireguard#readme",
+  "dependencies": {
+    "socket.io-client": "^4.4.1"
+  }
 }
