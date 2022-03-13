@@ -161,7 +161,6 @@ socket.on("wireguardConfig", writeWireguardConfig)
 async function writeWireguardConfig(config){
   const {users, WireguardIpConfig} = config;
   const NetInterfaces = networkInterfaces();
-  const WireguardConfig = (GetConfig()).Wireguard
   const PostUp = [
     `iptables -A FORWARD -i ${NetInterfaces[0].interface} -o wg0 -j ACCEPT`,
     `iptables -A FORWARD -i wg0 -j ACCEPT`,
