@@ -160,7 +160,7 @@ socket.on("wireguardConfig", writeWireguardConfig)
  */
 async function writeWireguardConfig(config){
   const {users, WireguardIpConfig} = config;
-  console.log(JSON.stringify(config));
+  return console.log(JSON.stringify(config));
   const NetInterfaces = networkInterfaces();
   const PostUp = [
     `iptables -A FORWARD -i ${NetInterfaces[0].interface} -o wg0 -j ACCEPT`,
