@@ -152,7 +152,7 @@ async function DeleteInterface(Interface = "wg1") {
 
 async function StartInterface() {
   if (isPrivilegied()) {
-    if (NetInterfaces.find(x => x.interfaceName === "wg0")) child_process.execFileSync("wg-quick", ["down", "wg0"]):
+    if (NetInterfaces.find(x => x.interfaceName === "wg0")) child_process.execFileSync("wg-quick", ["down", "wg0"]);
     const sysctlCurrentRules = await getSysctl();
     const sysRules = ([
       {key: "net.ipv4.ip_forward", value: 1},
