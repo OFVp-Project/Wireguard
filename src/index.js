@@ -214,5 +214,4 @@ async function writeWireguardConfig(config){
   } else Console.err("Docker is not privilegied");
   return;
 }
-//socket.on("wireguardConfig", writeWireguardConfig);
-socket.on("wireguardConfig", (..data)=>console.log(JSON.stringify(data)););
+socket.on("wireguardConfig", writeWireguardConfig);
