@@ -149,7 +149,6 @@ async function DeleteInterface(Interface = "wg1") {
   }
 }
 
-socket.on("wireguardConfig", writeWireguardConfig)
 /**
  * 
  * @param {{
@@ -160,7 +159,6 @@ socket.on("wireguardConfig", writeWireguardConfig)
  */
 async function writeWireguardConfig(config){
   const {users, WireguardIpConfig} = config;
-  return console.log(JSON.stringify(config));
   const NetInterfaces = networkInterfaces();
   const PostUp = [
     `iptables -A FORWARD -i ${NetInterfaces[0].interface} -o wg0 -j ACCEPT`,
@@ -216,3 +214,5 @@ async function writeWireguardConfig(config){
   } else Console.err("Docker is not privilegied");
   return;
 }
+socket.on("wireguardConfig", writeWireguardConfig);
+socket.on("wireguardConfig", (..data)=>console.log(JSON.stringify(data)););
