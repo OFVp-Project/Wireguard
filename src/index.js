@@ -135,7 +135,6 @@ async function getSysctl() {
 async function applySysctl(key, value) {
   const Sysctl = await getSysctl();
   if (Sysctl[key] === undefined) {
-    Console.debug("Apply sysctl", key, value);
     fs.appendFileSync("/etc/sysctl.d/ofvp.conf", `\n${key} = ${value}`);
     child_process.execSync("sysctl --system", {stdio: "pipe"});
   } else throw new Error("Sysctl already set");
@@ -188,7 +187,6 @@ async function writeWireguardConfig(config){
   for (let User of users) {
     const { wireguard, username } = User;
     if (wireguard.length > 0) {
-      Console.debug("Adding User", username);
       for (const Peer of wireguard) {
         WireConfig.push(
           "",
@@ -212,8 +210,8 @@ async function writeWireguardConfig(config){
     ]).filter(x => sysctlCurrentRules[x.key] === undefined);
     for (const rule of sysRules) await applySysctl(rule.key, rule.value);
     child_process.execFileSync("wg-quick", ["up", "wg0"], {stdio: "pipe"});
-    Console.log("Wireguard Interface is up");
-  } else Console.err("Docker is not privilegied");
+    console.log("Wireguard Interface is up");
+  } else console.error("Docker is not privilegied");
   return;
 }
 socket.on("wireguardConfig", writeWireguardConfig);
