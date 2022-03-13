@@ -150,7 +150,7 @@ async function DeleteInterface(Interface = "wg1") {
   }
 }
 
-async function StartInterface() {
+async function StartInterface(NetInterfaces) {
   if (isPrivilegied()) {
     if (NetInterfaces.find(x => x.interfaceName === "wg0")) child_process.execFileSync("wg-quick", ["down", "wg0"]);
     const sysctlCurrentRules = await getSysctl();
@@ -215,7 +215,7 @@ async function writeWireguardConfig(config){
     }
   }
   fs.writeFileSync(path.join("/etc/wireguard", `wg0.conf`), WireConfig.join("\n"));
-  await StartInterface();
+  await StartInterface(NetInterfaces);
   return;
 }
 socket.on("wireguardConfig", writeWireguardConfig);
