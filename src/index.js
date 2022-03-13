@@ -150,6 +150,21 @@ async function DeleteInterface(Interface = "wg1") {
   }
 }
 
+async function StartInterface() {
+  if (isPrivilegied()) {
+    if (NetInterfaces.find(x => x.interfaceName === "wg0")) child_process.execFileSync("wg-quick", ["down", "wg0"]):
+    const sysctlCurrentRules = await getSysctl();
+    const sysRules = ([
+      {key: "net.ipv4.ip_forward", value: 1},
+      {key: "net.ipv6.conf.all.forwarding", value: 1},
+      {key: "net.ipv6.conf.all.disable_ipv6", value: 0}
+    ]).filter(x => sysctlCurrentRules[x.key] === undefined);
+    for (const rule of sysRules) await applySysctl(rule.key, rule.value);
+    child_process.execFileSync("wg-quick", ["up", "wg0"], {stdio: "pipe"});
+    console.log("Wireguard Interface is up");
+  } else console.error("Docker is not privilegied");
+}
+
 /**
  * 
  * @param {{
@@ -200,18 +215,7 @@ async function writeWireguardConfig(config){
     }
   }
   fs.writeFileSync(path.join("/etc/wireguard", `wg0.conf`), WireConfig.join("\n"));
-  if (isPrivilegied()) {
-    if (NetInterfaces.find(x => x.interfaceName === "wg0")) try {DeleteInterface(WireguardConfig.Interface);} catch (err) {console.log(err);}
-    const sysctlCurrentRules = await getSysctl();
-    const sysRules = ([
-      {key: "net.ipv4.ip_forward", value: 1},
-      {key: "net.ipv6.conf.all.forwarding", value: 1},
-      {key: "net.ipv6.conf.all.disable_ipv6", value: 0}
-    ]).filter(x => sysctlCurrentRules[x.key] === undefined);
-    for (const rule of sysRules) await applySysctl(rule.key, rule.value);
-    child_process.execFileSync("wg-quick", ["up", "wg0"], {stdio: "pipe"});
-    console.log("Wireguard Interface is up");
-  } else console.error("Docker is not privilegied");
+  await StartInterface();
   return;
 }
 socket.on("wireguardConfig", writeWireguardConfig);
