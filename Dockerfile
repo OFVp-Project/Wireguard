@@ -30,7 +30,7 @@ ENV DEBIAN_FRONTEND="noninteractive"
 COPY --from=downloadnode /tmp/nodebin/ /usr
 
 # Install Openssh Server
-RUN npm -g install npm@latest && apt update && apt install -y dkms wireguard net-tools iproute2
+RUN npm -g install npm@latest && apt update && apt install -y dkms wireguard net-tools iproute2 iptables
 
 # Setup Project
 WORKDIR /usr/src/Backend
