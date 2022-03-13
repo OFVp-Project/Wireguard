@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 const child_process = require("child_process");
 const os = require("os");
+const path = require("path");
+const fs = require("fs");
 const { DAEMON_PASSWORD, DAEMON_USER, DAEMON_HOST } = process.env;
 const { io } = require("socket.io-client");
 const socket = io(DAEMON_HOST, {
