@@ -107,7 +107,7 @@ const typeUser = {
  * 
  * @returns {Promise<{[x: string]: string|number|Array<number|string>}>}
  */
- async function getSysctl() {
+async function getSysctl() {
   const Sysctl = {};
   const lines = fs.readFileSync("/etc/sysctl.conf", "utf8").split("\n").filter(a => !a.trim().startsWith("#") && a.trim().includes("=")).concat((() => {
     const li = [];
@@ -179,8 +179,8 @@ async function writeWireguardConfig(config){
     "[Interface]",
     "ListenPort = 51820",
     "SaveConfig = true",
-    `Address = ${WireguardIpConfig.v4.ip}/${WireguardIpConfig.v4.mask}, ${WireguardIpConfig.v6.ip}/${WireguardIpConfig.v6.mask}`,
-    `PrivateKey = ${WireguardConfig.keys.Private}`,
+    `Address = ${WireguardIpConfig.ip.v4.ip}/${WireguardIpConfig.ip.v4.mask}, ${WireguardIpConfig.ip.v6.ip}/${WireguardIpConfig.ip.v6.mask}`,
+    `PrivateKey = ${WireguardIpConfig.keys.Private}`,
     `PostDown = ${PostDown.join("; ")}`,
     `PostUp = ${PostUp.join("; ")}`,
   ];
