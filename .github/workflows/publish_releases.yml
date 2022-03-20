@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     name: Publish version
     environment:
-      name: PublishRelease
+      name: Docker_Version
       url: "ghcr.io/ofvp-project/wireguard"
     steps:
       - uses: actions/checkout@v2.4.0
