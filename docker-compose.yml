@@ -21,21 +21,7 @@ services:
     - "--quiet"
     - "--logpath"
     - "/dev/null"
-  ofvp_daemon_maneger:
-    container_name: ofvp_daemon_maneger
-    restart: on-failure
-    image: ghcr.io/ofvp-project/deamonmaneger:nightly
-    depends_on:
-      - ofvp_mongodb
-    networks:
-      - "ofvp_network"
-    environment:
-      NODE_ENV: "development"
-      MongoDB_URL: "mongodb://ofvp_mongodb:27017"
-      COOKIE_SECRET: "dev"
-      PASSWORD_ENCRYPT: "dev"
-    ports:
-      - 3000:3000/tcp
+
   ofvp_wireguard:
     container_name: ofvp_wireguard
     restart: on-failure
@@ -49,9 +35,26 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    depends_on:
-      - ofvp_daemon_maneger
     networks:
       - "ofvp_network"
     volumes:
       - /lib/modules/:/lib/modules/:ro
+
+  ofvp_daemon_maneger:
+    container_name: ofvp_daemon_maneger
+    restart: on-failure
+    image: ghcr.io/ofvp-project/deamonmaneger:latest
+    depends_on:
+      - ofvp_mongodb
+      - ofvp_wireguard
+    networks:
+      - "ofvp_network"
+    environment:
+      NODE_ENV: "development"
+      MongoDB_URL: "mongodb://ofvp_mongodb:27017"
+      COOKIE_SECRET: "dev"
+      PASSWORD_ENCRYPT: "dev"
+      WIREGUARD_ENDPOINT_HOST: "ofvp_wireguard"
+      WIREGUARD_ENDPOINT_PORT: "3001"
+    ports:
+      - 3000:3000/tcp

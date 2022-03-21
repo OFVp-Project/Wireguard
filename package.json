@@ -17,6 +17,7 @@
   },
   "homepage": "https://github.com/OFVp-Project/Wireguard#readme",
   "dependencies": {
-    "socket.io-client": "^4.4.1"
+    "cors": "^2.8.5",
+    "express": "^4.17.3"
   }
 }
