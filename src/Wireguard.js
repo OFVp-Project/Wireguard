@@ -160,7 +160,6 @@ module.exports.writeWireguardConfig = writeWireguardConfig;
  * @returns 
  */
 async function writeWireguardConfig(config){
-  console.log(config);
   const {users, WireguardIpConfig} = config;
   const NetInterfaces = networkInterfaces();
   const PostUp = [

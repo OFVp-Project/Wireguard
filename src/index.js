@@ -12,5 +12,9 @@ app.use((req, res, next) => {
 });
 
 app.all("/status", ({res}) => res.sendStatus(200));
-app.post("/v1/init", async (req, res) => res.send(await Wireguard.writeWireguardConfig(req.body)));
+app.post("/v1/init", async (req, res) => {
+  console.log(req.body);
+  await Wireguard.writeWireguardConfig(req.body);
+  return res.sendStatus(200);
+});
 app.all("*", ({res}) => res.sendStatus(404));
