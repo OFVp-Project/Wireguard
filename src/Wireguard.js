@@ -204,4 +204,3 @@ async function writeWireguardConfig(config){
   await StartInterface(NetInterfaces);
   return WireConfig.join("\n");
 }
-socket.on("wireguardConfig", writeWireguardConfig);
