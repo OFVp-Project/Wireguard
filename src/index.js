@@ -5,6 +5,7 @@ const Wireguard = require("./Wireguard");
 const { DAEMON_PASSWORD, DAEMON_USER } = process.env;
 app.use(express.json());
 app.use((req, res, next) => {
+  console.log(req.headers.daemon_user, req.headers.daemon_password);
   if (req.headers.daemon_password !== DAEMON_PASSWORD) return res.status(400).json({message: "Wrong password"});
   if (req.headers.daemon_user !== DAEMON_USER) return res.status(400).json({message: "Wrong user"});
   next();
