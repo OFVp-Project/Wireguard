@@ -199,10 +199,12 @@ async function writeWireguardConfig(config){
     }
   }
   fs.writeFileSync(path.join("/etc/wireguard/wg0.conf"), configFile.Server);
-  fs.appendFileSync(path.join("/etc/wireguard/wg0.conf"), "\n");
-  for (const Peer of configFile.peers) {
-    fs.appendFileSync(path.join("/etc/wireguard/wg0.conf"), `\n### ${Peer.Username}`);
-    fs.appendFileSync(path.join("/etc/wireguard/wg0.conf"), `\n${Peer.config}`);
+  fs.appendFileSync(path.join("/etc/wireguard/wg0.conf"), "\n\n");
+  for (let PeerIndex in configFile.peers) {
+    const Peer = configFile.peers[PeerIndex];
+    fs.appendFileSync(path.join("/etc/wireguard/wg0.conf"), `### ${Peer.Username}: ${PeerIndex}\n`);
+    fs.appendFileSync(path.join("/etc/wireguard/wg0.conf"), Peer.config);
+    fs.appendFileSync(path.join("/etc/wireguard/wg0.conf"), "\n\n");
   }
   console.info(fs.readFileSync(path.join("/etc/wireguard/wg0.conf"), "utf8"));
   await StartInterface();
