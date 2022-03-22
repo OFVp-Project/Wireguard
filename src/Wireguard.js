@@ -125,19 +125,11 @@ async function applySysctl(key, value) {
   } else throw new Error("Sysctl already set");
 }
 
-async function DeleteInterface(Interface = "wg1") {
-  if (!Interface) throw new Error("Interface is not defined");
-  try {
-    child_process.execFileSync("ip", ["link", "delete", Interface]);
-  } catch (err) {
-    console.log(err);
-    throw new Error("Connot delete interface");
-  }
-}
-
-async function StartInterface(NetInterfaces) {
+const downWgQuick = interface => (child_process.execFileSync("wg-quick", ["down", interface], {stdio: "pipe", maxBuffer: Infinity})).toString("utf8");
+async function StartInterface() {
   if (isPrivilegied()) {
-    if (NetInterfaces.find(x => x.interfaceName === "wg0")) child_process.execFileSync("wg-quick", ["down", "wg0"]);
+    const NetInterfaces = networkInterfaces();
+    if (!!NetInterfaces.find(x => x.interface === "wg0")) downWgQuick("wg0");
     const sysctlCurrentRules = await getSysctl();
     const sysRules = ([
       {key: "net.ipv4.ip_forward", value: 1},
@@ -176,31 +168,43 @@ async function writeWireguardConfig(config){
     `ip6tables -D FORWARD -i wg0 -j ACCEPT`,
     `ip6tables -t nat -D POSTROUTING -o ${NetInterfaces[0].interface} -j MASQUERADE`
   ];
-  const WireConfig = [
-    "[Interface]",
-    "ListenPort = 51820",
-    "SaveConfig = true",
-    `Address = ${WireguardIpConfig.ip.v4.ip}/${WireguardIpConfig.ip.v4.mask}, ${WireguardIpConfig.ip.v6.ip}/${WireguardIpConfig.ip.v6.mask}`,
-    `PrivateKey = ${WireguardIpConfig.keys.Private}`,
-    `PostDown = ${PostDown.join("; ")}`,
-    `PostUp = ${PostUp.join("; ")}`,
-  ];
+
+  /** @type {{Server: string; peers: Array<{Username: string, config: string;}>;}} */
+  const configFile = {
+    Server:  ([
+      "[Interface]",
+      "ListenPort = 51820",
+      "SaveConfig = true",
+      `Address = ${WireguardIpConfig.ip.v4.ip}/${WireguardIpConfig.ip.v4.mask}, ${WireguardIpConfig.ip.v6.ip}/${WireguardIpConfig.ip.v6.mask}`,
+      `PrivateKey = ${WireguardIpConfig.keys.Private}`,
+      ...PostUp.map(Rule => `PostUp = ${Rule}`),
+      ...PostDown.map(Rule => `PostDown = ${Rule}`)
+    ]).join("\n"),
+    peers: []
+  }
   for (let User of users) {
     const { wireguard, username } = User;
     if (wireguard.length > 0) {
       for (const Peer of wireguard) {
-        WireConfig.push(
-          "",
-          `### Client: ${username}`,
-          `[Peer]`,
-          `PublicKey = ${Peer.keys.Public}`,
-          `PresharedKey = ${Peer.keys.Preshared}`,
-          `AllowedIPs = ${Peer.ip.v4.ip}/${Peer.ip.v4.mask}, ${Peer.ip.v6.ip}/${Peer.ip.v6.mask}`,
-        );
+        configFile.peers.push({
+          Username: username,
+          config: ([
+            `[Peer]`,
+            `PublicKey = ${Peer.keys.Public}`,
+            `PresharedKey = ${Peer.keys.Preshared}`,
+            `AllowedIPs = ${Peer.ip.v4.ip}/${Peer.ip.v4.mask}, ${Peer.ip.v6.ip}/${Peer.ip.v6.mask}`
+          ]).join("\n")
+        });
       }
     }
   }
-  fs.writeFileSync(path.join("/etc/wireguard", `wg0.conf`), WireConfig.join("\n"));
-  await StartInterface(NetInterfaces);
+  fs.writeFileSync(path.join("/etc/wireguard/wg0.conf"), configFile.Server);
+  fs.appendFileSync(path.join("/etc/wireguard/wg0.conf"), "\n");
+  for (const Peer of configFile.peers) {
+    fs.appendFileSync(path.join("/etc/wireguard/wg0.conf"), `\n### ${Peer.Username}`);
+    fs.appendFileSync(path.join("/etc/wireguard/wg0.conf"), `\n${Peer.config}`);
+  }
+  console.info(fs.readFileSync(path.join("/etc/wireguard/wg0.conf"), "utf8"));
+  await StartInterface();
   return WireConfig.join("\n");
 }

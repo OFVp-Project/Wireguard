@@ -34,7 +34,9 @@ RUN npm -g install npm@latest && apt update && apt install -y dkms wireguard net
 
 # Setup Project
 WORKDIR /usr/src/Backend
-ENV DAEMON_PASSWORD="" DAEMON_USER=""
+ENV DAEMON_PASSWORD=""
+ENV DAEMON_USER=""
+ENV DAEMON_HOST="http://localhost:5000"
 EXPOSE 51820/tcp
 ENTRYPOINT [ "node", "--trace-warnings", "src/index.js" ]
 COPY package*.json ./

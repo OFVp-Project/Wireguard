@@ -1,20 +1,14 @@
-const express = require("express");
-const app = express();
-app.listen(3001, () => console.log("listening on port 3001 to wireguard maneger. dont expose to internet!"));
-const Wireguard = require("./Wireguard");
-const { DAEMON_PASSWORD, DAEMON_USER } = process.env;
-app.use(express.json());
-app.use((req, res, next) => {
-  console.log(req.headers.daemon_user, req.headers.daemon_password);
-  if (req.headers.daemon_password !== DAEMON_PASSWORD) return res.status(400).json({message: "Wrong password"});
-  if (req.headers.daemon_user !== DAEMON_USER) return res.status(400).json({message: "Wrong user"});
-  next();
+const { DAEMON_PASSWORD, DAEMON_USER, DAEMON_HOST } = process.env;
+const io = (require("socket.io-client")).io(DAEMON_HOST, {auth: {username: DAEMON_USER, password: DAEMON_PASSWORD}});
+io.on("conneted", () => console.info("Connected to daemon"));
+io.on("disconnect", () => console.info("Disconnected from daemon"));
+io.on("error", err => {
+  console.info("Error to connect to daemon");
+  console.info(err);
+  process.exit(2);
 });
 
-app.all("/status", ({res}) => res.sendStatus(200));
-app.post("/v1/init", async (req, res) => {
-  console.log(req.body);
-  await Wireguard.writeWireguardConfig(req.body);
-  return res.sendStatus(200);
+io.on("wireguard", data => {
+  const Wireguard = require("./Wireguard");
+  Wireguard.writeWireguardConfig(data);
 });
-app.all("*", ({res}) => res.sendStatus(404));
