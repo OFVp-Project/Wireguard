@@ -206,5 +206,5 @@ async function writeWireguardConfig(config){
   }
   console.info(fs.readFileSync(path.join("/etc/wireguard/wg0.conf"), "utf8"));
   await StartInterface();
-  return WireConfig.join("\n");
+  return configFile;
 }
