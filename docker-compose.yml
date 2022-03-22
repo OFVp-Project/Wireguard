@@ -22,11 +22,35 @@ services:
     - "--logpath"
     - "/dev/null"
 
+  ofvp_daemon_maneger:
+    container_name: ofvp_daemon_maneger
+    restart: on-failure
+    image: ghcr.io/ofvp-project/deamonmaneger:latest
+    depends_on:
+      - ofvp_mongodb
+    networks:
+      - "ofvp_network"
+    environment:
+      NODE_ENV: "development"
+      MongoDB_URL: "mongodb://ofvp_mongodb:27017"
+      COOKIE_SECRET: "dev"
+      PASSWORD_ENCRYPT: "dev"
+      WIREGUARD_ENDPOINT_HOST: "ofvp_wireguard"
+      WIREGUARD_ENDPOINT_PORT: "3001"
+    ports:
+      - 3000:3000/tcp
+
   ofvp_wireguard:
     container_name: ofvp_wireguard
     restart: on-failure
     image: ghcr.io/ofvp-project/wireguard:local
     privileged: true
+    depends_on:
+      - ofvp_daemon_maneger
+    environment:
+      DAEMON_PASSWORD: "dev"
+      DAEMON_USER: "dev"
+      DAEMON_HOST: "http://ofvp_daemon_maneger:5000"
     sysctls:
       net.ipv4.conf.all.src_valid_mark: 1
       net.ipv6.conf.all.disable_ipv6: 0
@@ -39,22 +63,3 @@ services:
       - "ofvp_network"
     volumes:
       - /lib/modules/:/lib/modules/:ro
-
-  ofvp_daemon_maneger:
-    container_name: ofvp_daemon_maneger
-    restart: on-failure
-    image: ghcr.io/ofvp-project/deamonmaneger:latest
-    depends_on:
-      - ofvp_mongodb
-      - ofvp_wireguard
-    networks:
-      - "ofvp_network"
-    environment:
-      NODE_ENV: "development"
-      MongoDB_URL: "mongodb://ofvp_mongodb:27017"
-      COOKIE_SECRET: "dev"
-      PASSWORD_ENCRYPT: "dev"
-      WIREGUARD_ENDPOINT_HOST: "ofvp_wireguard"
-      WIREGUARD_ENDPOINT_PORT: "3001"
-    ports:
-      - 3000:3000/tcp
