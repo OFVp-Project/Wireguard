@@ -2,7 +2,7 @@ FROM ubuntu:latest AS downloadnode
 ENV DEBIAN_FRONTEND="noninteractive"
 
 # Install core packages
-RUN apt update && apt -y install wget curl unzip zip ca-certificates tar
+RUN apt update && apt -y install wget curl tar
 
 # Install latest docker image
 RUN mkdir /tmp/Node && NODEURL=""; NODEVERSION=$(curl -sL https://api.github.com/repos/nodejs/node/releases | grep tag_name | cut -d '"' -f 4 | sort -V | tail -n 1) && \
@@ -10,9 +10,9 @@ case $(uname -m) in \
   x86_64 ) NODEURL="https://nodejs.org/download/release/$NODEVERSION/node-$NODEVERSION-linux-x64.tar.gz";; \
   aarch64 ) NODEURL="https://nodejs.org/download/release/$NODEVERSION/node-$NODEVERSION-linux-arm64.tar.gz";; \
   armv7l ) NODEURL="https://nodejs.org/download/release/$NODEVERSION/node-$NODEVERSION-linux-armv7l.tar.gz";; \
-  ppc64el ) NODEURL="https://nodejs.org/download/release/$NODEVERSION/node-$NODEVERSION-linux-ppc64le.tar.gz";; \
+  ppc64le ) NODEURL="https://nodejs.org/download/release/$NODEVERSION/node-$NODEVERSION-linux-ppc64le.tar.gz";; \
   s390x ) NODEURL="https://nodejs.org/download/release/$NODEVERSION/node-$NODEVERSION-linux-s390x.tar.gz";; \
-  *) echo "Unsupported architecture"; exit 1;; \
+  *) echo "Unsupported architecture ($(uname -m))"; exit 1;; \
 esac && \
 echo "Node bin Url: ${NODEURL}"; wget -q "${NODEURL}" -O /tmp/node.tar.gz && \
 tar xfz /tmp/node.tar.gz -C /tmp/Node && \
