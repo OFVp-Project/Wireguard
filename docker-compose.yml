@@ -1,5 +1,6 @@
 version: "3.9"
 volumes:
+  data_api:
   MongoOFVp:
 networks:
   ofvp_network:
@@ -35,31 +36,35 @@ services:
       MongoDB_URL: "mongodb://ofvp_mongodb:27017"
       COOKIE_SECRET: "dev"
       PASSWORD_ENCRYPT: "dev"
-      WIREGUARD_ENDPOINT_HOST: "ofvp_wireguard"
-      WIREGUARD_ENDPOINT_PORT: "3001"
+      DAEMON_PASSWORD: "dev"
+      DAEMON_USER: "dev"
     ports:
       - 3000:3000/tcp
+    volumes:
+      - data_api:/data
 
   ofvp_wireguard:
     container_name: ofvp_wireguard
     restart: on-failure
-    image: ghcr.io/ofvp-project/wireguard:local
-    privileged: true
-    depends_on:
-      - ofvp_daemon_maneger
-    environment:
-      DAEMON_PASSWORD: "dev"
-      DAEMON_USER: "dev"
-      DAEMON_HOST: "http://ofvp_daemon_maneger:5000"
-    sysctls:
-      net.ipv4.conf.all.src_valid_mark: 1
-      net.ipv6.conf.all.disable_ipv6: 0
-      net.ipv6.conf.all.forwarding: 1
-      net.ipv4.ip_forward: 1
+    image: ghcr.io/ofvp-project/wireguard:latest
     build:
       context: .
       dockerfile: Dockerfile
     networks:
       - "ofvp_network"
+    environment:
+      DAEMON_HOST: "http://ofvp_daemon_maneger:5000"
+      DAEMON_PASSWORD: "dev"
+      DAEMON_USER: "dev"
+    privileged: true
+    sysctls:
+      net.ipv4.conf.all.src_valid_mark: 1
+      net.ipv6.conf.all.disable_ipv6: 0
+      net.ipv6.conf.all.forwarding: 1
+      net.ipv4.ip_forward: 1
     volumes:
       - /lib/modules/:/lib/modules/:ro
+    ports:
+      - 51820:51820/udp
+    depends_on:
+      - ofvp_daemon_maneger

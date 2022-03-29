@@ -125,11 +125,11 @@ async function applySysctl(key, value) {
   } else throw new Error("Sysctl already set");
 }
 
+let initLoad = false;
 const downWgQuick = interface => (child_process.execFileSync("wg-quick", ["down", interface], {stdio: "pipe", maxBuffer: Infinity})).toString("utf8");
 async function StartInterface() {
   if (isPrivilegied()) {
     const NetInterfaces = networkInterfaces();
-    if (!!NetInterfaces.find(x => x.interface === "wg0")) downWgQuick("wg0");
     const sysctlCurrentRules = await getSysctl();
     const sysRules = ([
       {key: "net.ipv4.ip_forward", value: 1},
@@ -137,7 +137,13 @@ async function StartInterface() {
       {key: "net.ipv6.conf.all.disable_ipv6", value: 0}
     ]).filter(x => sysctlCurrentRules[x.key] === undefined);
     for (const rule of sysRules) await applySysctl(rule.key, rule.value);
-    child_process.execFileSync("wg-quick", ["up", "wg0"], {stdio: "pipe"});
+    if (initLoad) {
+      child_process.spawnSync("wg syncconf wg0 <(wg-quick strip wg0)", {stdio: "pipe", "encoding": "utf8"});
+    } else {
+      if (!!NetInterfaces.find(x => x.interface === "wg0")) downWgQuick("wg0");
+      child_process.execFileSync("wg-quick", ["up", "wg0"], {stdio: "pipe"});
+      initLoad = true;
+    }
     console.log("Wireguard Interface is up");
   } else console.error("Docker is not privilegied");
 }
@@ -147,7 +153,7 @@ module.exports.writeWireguardConfig = writeWireguardConfig;
  * 
  * @param {{
  *   users: Array<typeUser>;
- *   WireguardIpConfig: {ip: {v4: {ip: string;mask: string;};v6: {ip: string;mask: string;};};keys: {Preshared: string;Private: string;Public: string;};}
+ *   WireguardIpConfig: {ip: Array<{v4: {ip: string;mask: string;};v6: {ip: string;mask: string;};}>;keys: {Preshared: string;Private: string;Public: string;};}
  * }} config
  * @returns 
  */
@@ -175,7 +181,7 @@ async function writeWireguardConfig(config){
       "[Interface]",
       "ListenPort = 51820",
       "SaveConfig = true",
-      `Address = ${WireguardIpConfig.ip.v4.ip}/${WireguardIpConfig.ip.v4.mask}, ${WireguardIpConfig.ip.v6.ip}/${WireguardIpConfig.ip.v6.mask}`,
+      ...WireguardIpConfig.ip.map(a => `Address = ${a.v4.ip}/${a.v4.mask}, ${a.v6.ip}/${a.v6.mask}`),
       `PrivateKey = ${WireguardIpConfig.keys.Private}`,
       ...PostUp.map(Rule => `PostUp = ${Rule}`),
       ...PostDown.map(Rule => `PostDown = ${Rule}`)
@@ -199,14 +205,14 @@ async function writeWireguardConfig(config){
     }
   }
   fs.writeFileSync(path.join("/etc/wireguard/wg0.conf"), configFile.Server);
-  fs.appendFileSync(path.join("/etc/wireguard/wg0.conf"), "\n\n");
+  // fs.appendFileSync(path.join("/etc/wireguard/wg0.conf"), "\n\n");
   for (let PeerIndex in configFile.peers) {
     const Peer = configFile.peers[PeerIndex];
+    fs.appendFileSync(path.join("/etc/wireguard/wg0.conf"), "\n\n");
     fs.appendFileSync(path.join("/etc/wireguard/wg0.conf"), `### ${Peer.Username}: ${PeerIndex}\n`);
     fs.appendFileSync(path.join("/etc/wireguard/wg0.conf"), Peer.config);
-    fs.appendFileSync(path.join("/etc/wireguard/wg0.conf"), "\n\n");
   }
-  console.info(fs.readFileSync(path.join("/etc/wireguard/wg0.conf"), "utf8"));
   await StartInterface();
+  // console.log(fs.readFileSync(path.join("/etc/wireguard/wg0.conf"), "utf8"));
   return configFile;
 }
