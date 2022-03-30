@@ -1,8 +1,9 @@
 #!/usr/bin/env node
-const child_process = require("child_process");
-const os = require("os");
-const path = require("path");
-const fs = require("fs");
+import * as child_process from "child_process";
+import * as os from "os";
+import * as path from "path";
+import * as fs from "fs";
+import * as types from "./types";
 
 function isPrivilegied() {
   try {
@@ -47,54 +48,7 @@ function networkInterfaces() {
   return localInterfaces;
 }
 
-/**
- * @type {{
- *  username: string;
- *  expire: Date;
- *  password: string|{
- *    iv: string;
- *    Encrypt: string;
- *  };
- *  ssh: {connections: number;};
- *  wireguard: Array<{
- *     keys: {
- *       Preshared: string;
- *       Private: string;
- *       Public: string;
- *     };
- *     ip: {
- *       v4: {ip: string; mask: string;};
- *       v6: {ip: string; mask: string;};
- *     }
- *   }>;
- * }}
- */
-const typeUser = {
-  username: "",
-  expire: new Date(),
-  password: {
-    iv: "",
-    Encrypt: "",
-  },
-  ssh: {connections: 0},
-  wireguard: [{
-    keys: {
-      Preshared: "",
-      Private: "",
-      Public: "",
-    },
-    ip: {
-      v4: {ip: "", mask: "",},
-      v6: {ip: "", mask: "",},
-    }
-  }]
-};
-
-/**
- * 
- * @returns {Promise<{[x: string]: string|number|Array<number|string>}>}
- */
-async function getSysctl() {
+async function getSysctl(): Promise<{[x: string]: string|number|Array<number|string>}> {
   const Sysctl = {};
   const lines = fs.readFileSync("/etc/sysctl.conf", "utf8").split("\n").filter(a => !a.trim().startsWith("#") && a.trim().includes("=")).concat((() => {
     const li = [];
@@ -122,11 +76,13 @@ async function applySysctl(key, value) {
   if (Sysctl[key] === undefined) {
     fs.appendFileSync("/etc/sysctl.d/ofvp.conf", `\n${key} = ${value}`);
     child_process.execSync("sysctl --system", {stdio: "pipe"});
-  } else throw new Error("Sysctl already set");
+    return;
+  }
+  throw new Error("Sysctl already set");
 }
 
 let initLoad = false;
-const downWgQuick = interface => (child_process.execFileSync("wg-quick", ["down", interface], {stdio: "pipe", maxBuffer: Infinity})).toString("utf8");
+const downWgQuick = (WireguardInterface: string) => (child_process.execFileSync("wg-quick", ["down", WireguardInterface], {stdio: "inherit", maxBuffer: Infinity})).toString("utf8");
 async function StartInterface() {
   if (isPrivilegied()) {
     const NetInterfaces = networkInterfaces();
@@ -138,26 +94,17 @@ async function StartInterface() {
     ]).filter(x => sysctlCurrentRules[x.key] === undefined);
     for (const rule of sysRules) await applySysctl(rule.key, rule.value);
     if (initLoad) {
-      child_process.spawnSync("wg syncconf wg0 <(wg-quick strip wg0)", {stdio: "pipe", "encoding": "utf8"});
+      child_process.spawnSync("wg syncconf wg0 <(wg-quick strip wg0)", {stdio: "inherit", encoding: "utf8"});
     } else {
       if (!!NetInterfaces.find(x => x.interface === "wg0")) downWgQuick("wg0");
-      child_process.execFileSync("wg-quick", ["up", "wg0"], {stdio: "pipe"});
+      child_process.execFileSync("wg-quick", ["up", "wg0"], {stdio: "inherit"});
       initLoad = true;
     }
     console.log("Wireguard Interface is up");
   } else console.error("Docker is not privilegied");
 }
 
-module.exports.writeWireguardConfig = writeWireguardConfig;
-/**
- * 
- * @param {{
- *   users: Array<typeUser>;
- *   WireguardIpConfig: {ip: Array<{v4: {ip: string;mask: string;};v6: {ip: string;mask: string;};}>;keys: {Preshared: string;Private: string;Public: string;};}
- * }} config
- * @returns 
- */
-async function writeWireguardConfig(config){
+export async function writeWireguardConfig(config: types.wireConfigInput){
   const {users, WireguardIpConfig} = config;
   const NetInterfaces = networkInterfaces();
   const PostUp = [
@@ -175,8 +122,7 @@ async function writeWireguardConfig(config){
     `ip6tables -t nat -D POSTROUTING -o ${NetInterfaces[0].interface} -j MASQUERADE`
   ];
 
-  /** @type {{Server: string; peers: Array<{Username: string, config: string;}>;}} */
-  const configFile = {
+  const configFile: {Server: string; peers: Array<{Username: string, config: string;}>;} = {
     Server:  ([
       "[Interface]",
       "ListenPort = 51820",
@@ -205,7 +151,6 @@ async function writeWireguardConfig(config){
     }
   }
   fs.writeFileSync(path.join("/etc/wireguard/wg0.conf"), configFile.Server);
-  // fs.appendFileSync(path.join("/etc/wireguard/wg0.conf"), "\n\n");
   for (let PeerIndex in configFile.peers) {
     const Peer = configFile.peers[PeerIndex];
     fs.appendFileSync(path.join("/etc/wireguard/wg0.conf"), "\n\n");
@@ -213,6 +158,5 @@ async function writeWireguardConfig(config){
     fs.appendFileSync(path.join("/etc/wireguard/wg0.conf"), Peer.config);
   }
   await StartInterface();
-  // console.log(fs.readFileSync(path.join("/etc/wireguard/wg0.conf"), "utf8"));
   return configFile;
 }

@@ -1,8 +1,14 @@
 {
   "name": "@ofvp_project/wireguard",
-  "version": "4.0.1",
+  "version": "4.1.0",
   "description": "One of the project servers, this server to create a vpn using the Wireguard protocol, which works on several devices.",
   "main": "src/index.js",
+  "author": "ofvp_project",
+  "license": "GPL-3.0-or-later",
+  "homepage": "https://github.com/OFVp-Project/Wireguard#readme",
+  "scripts": {
+    "build": "tsc"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/OFVp-Project/Wireguard.git"
@@ -10,13 +16,14 @@
   "keywords": [
     "ofvp_project"
   ],
-  "author": "ofvp_project",
-  "license": "GPL-3.0-or-later",
   "bugs": {
     "url": "https://github.com/OFVp-Project/Wireguard/issues"
   },
-  "homepage": "https://github.com/OFVp-Project/Wireguard#readme",
   "dependencies": {
-    "socket.io-client": "^4.4.1"
+    "socket.io-client": "^4.4.1",
+    "typescript": "^4.6.3"
+  },
+  "devDependencies": {
+    "@types/node": "^17.0.23"
   }
 }
