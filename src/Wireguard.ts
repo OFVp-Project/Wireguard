@@ -105,6 +105,7 @@ async function StartInterface() {
 }
 
 export async function writeWireguardConfig(config: types.wireConfigInput){
+  console.log(config);
   const {users, WireguardIpConfig} = config;
   const NetInterfaces = networkInterfaces();
   const PostUp = [
