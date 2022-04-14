@@ -1,10 +1,11 @@
 {
-  "name": "ofvpserver",
+  "name": "ofvp_wireguard",
   "dockerFile": "Dockerfile",
   "updateRemoteUserUID": false,
   "containerUser": "gitpod",
   "remoteUser": "gitpod",
-  "postCreateCommand": "sudo screen -dm -L -Logfile /tmp/dockerd.log dockerd && npm install",
+  "postCreateCommand": "screen -dm sudo dockerd",
+  "postStartCommand": "npm install",
   "runArgs": [
     "--init",
     "--privileged"

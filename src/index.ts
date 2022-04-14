@@ -12,5 +12,6 @@ ioClient.on("error", err => {
 });
 
 ioClient.on("wireguard", data => {
-  Wireguard.writeWireguardConfig(data);
+  console.log(data);
+  return Wireguard.writeWireguardConfig(data);
 });
