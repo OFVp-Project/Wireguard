@@ -8,7 +8,7 @@ ENV DEBIAN_FRONTEND="noninteractive"
 
 # Install node
 RUN \
-  apt update && apt install -y curl wget && \
+  apt update && apt install -y curl wget python3-minimal && \
   VERSION=$(wget -qO- https://api.github.com/repos/Sirherobrine23/DebianNodejsFiles/releases/latest |grep 'name' | grep "nodejs"|grep "$(dpkg --print-architecture)"|cut -d '"' -f 4 | sed 's|nodejs_||g' | sed -e 's|_.*.deb||g'|sort | uniq|tail -n 1); \
   wget -q "https://github.com/Sirherobrine23/DebianNodejsFiles/releases/download/debs/nodejs_${VERSION}_$(dpkg --print-architecture).deb" -O /tmp/nodejs.deb && \
   apt remove --purge -y wget curl && \

@@ -4,8 +4,7 @@
   "updateRemoteUserUID": false,
   "containerUser": "gitpod",
   "remoteUser": "gitpod",
-  "postCreateCommand": "screen -dm sudo dockerd",
-  "postStartCommand": "npm install",
+  "postStartCommand": "screen -dm sudo dockerd",
   "runArgs": [
     "--init",
     "--privileged"
