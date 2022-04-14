@@ -1,4 +1,5 @@
-#image: ghcr.io/ofvp-project/devcontainer
+image:
+  file: .devcontainer/Dockerfile
 tasks:
   - init: npm install
 ports:
