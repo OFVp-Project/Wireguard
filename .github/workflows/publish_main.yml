@@ -5,7 +5,7 @@ on:
       - main
 
 env:
-  DOCKERPLATFORM: "linux/amd64,linux/arm64"
+  DOCKERPLATFORM: "linux/amd64,linux/arm64,linux/s390x"
   DOCKERIMAGE: "ghcr.io/ofvp-project/wireguard"
 
 jobs:

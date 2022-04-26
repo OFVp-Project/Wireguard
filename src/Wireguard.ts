@@ -2,7 +2,7 @@
 import * as child_process from "child_process";
 import * as os from "os";
 import * as path from "path";
-import * as fs from "fs";
+import fs, {promises as fsPromise} from "fs";
 import * as types from "./types";
 
 function isPrivilegied() {
@@ -50,23 +50,30 @@ function networkInterfaces() {
 
 async function getSysctl(): Promise<{[x: string]: string|number|Array<number|string>}> {
   const Sysctl = {};
-  const lines = fs.readFileSync("/etc/sysctl.conf", "utf8").split("\n").filter(a => !a.trim().startsWith("#") && a.trim().includes("=")).concat((() => {
-    const li = [];
-    for (const a of fs.readdirSync("/etc/sysctl.d").filter(a => a.endsWith(".conf"))) {
-      const l = fs.readFileSync(path.join("/etc/sysctl.d", a), "utf8").split("\n").filter(a => !a.trim().startsWith("#") && a.trim().includes("="));
-      li.push(...l);
-    };
-    return li;
-  })() )
-  for (const line of lines) {
-    const [key, value] = line.split(/\s+\=\s+|\=/);
-    if (/[0-9\s]+/.test(value)) {
-      if (/\s+/gi.test(value)) Sysctl[key] = value.split(/\s+/gi).map(value => {
-        if (/^[0-9]+$/gi.test(value)) return parseInt(value);
-        else return value;
-      });
-      else Sysctl[key] = parseInt(value);
-    } else Sysctl[key] = parseInt(value);
+  await new Promise(async resolve => {
+    if (fs.existsSync("/etc/sysctl.conf")) {
+      await fsPromise.readFile("/etc/sysctl.conf", "utf8").then(async data => {
+        for (const line of data.replace(/\r\n/gi, "\n").split("\n")) {
+          const match = line.match(/(.*)=(.*)/);
+          if (match) Sysctl[match[1].trim()] = match[2].trim();
+        }
+      }).catch(() => {});
+      if (fs.existsSync("/etc/sysctl.d")) await fsPromise.readdir("/etc/sysctl.d").then(async files => {
+        for (const file of files) {
+          const data = await fsPromise.readFile(path.join("/etc/sysctl.d", file), "utf8");
+          for (const line of data.replace(/\r\n/gi, "\n").split("\n")) {
+            const match = line.match(/(.*)=(.*)/);
+            if (match) Sysctl[match[1].trim()] = match[2].trim();
+          }
+        }
+      }).catch(() => {});
+    }
+    return resolve("");
+  });
+  for (const keU of Object.keys(Sysctl)) {
+    if (keU.startsWith("#")) delete Sysctl[keU];
+    else if (isNaN(parseFloat(Sysctl[keU]))) Sysctl[keU] = Sysctl[keU];
+    else if (/[0-9]+/.test(Sysctl[keU])) Sysctl[keU] = parseFloat(Sysctl[keU]);
   }
   return Sysctl;
 }
@@ -74,7 +81,9 @@ async function getSysctl(): Promise<{[x: string]: string|number|Array<number|str
 async function applySysctl(key, value) {
   const Sysctl = await getSysctl();
   if (Sysctl[key] === undefined) {
-    fs.appendFileSync("/etc/sysctl.d/ofvp.conf", `\n${key} = ${value}`);
+    if (!(fs.existsSync("/etc/sysctl.d"))) await fsPromise.mkdir("/etc/sysctl.d", {recursive: true});
+    if (fs.existsSync("/etc/sysctl.d/ofvp.conf")) fs.appendFileSync("/etc/sysctl.d/ofvp.conf", `\n${key} = ${value}`);
+    else await fsPromise.writeFile("/etc/sysctl.d/ofvp.conf", `${key} = ${value}`, {encoding: "utf8"});
     child_process.execSync("sysctl --system", {stdio: "pipe"});
     return;
   }
@@ -104,7 +113,20 @@ async function StartInterface() {
   } else console.error("Docker is not privilegied");
 }
 
-export async function writeWireguardConfig(config: types.wireConfigInput){
+process.on("SIGINT", () => {
+  console.log("\nShutting down...");
+  if (isPrivilegied()) {
+    child_process.execFileSync("wg-quick", ["down", "wg0"], {stdio: "inherit", maxBuffer: Infinity});
+    console.log("Wireguard Interface is down");
+  }
+  process.exit(0);
+});
+
+export async function writeWireguardConfig(config: types.wireConfigInput): Promise<void>{
+  if (config.users.length === 0) {
+    console.error("No users");
+    return;
+  }
   const {users, WireguardIpConfig} = config;
   const NetInterfaces = networkInterfaces();
   const PostUp = [
@@ -158,5 +180,5 @@ export async function writeWireguardConfig(config: types.wireConfigInput){
     fs.appendFileSync(path.join("/etc/wireguard/wg0.conf"), Peer.config);
   }
   await StartInterface();
-  return configFile;
+  return;
 }
