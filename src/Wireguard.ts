@@ -3,7 +3,7 @@ import * as child_process from "child_process";
 import * as os from "os";
 import * as path from "path";
 import fs, {promises as fsPromise} from "fs";
-import * as types from "./types";
+import { wireguardType } from "./types";
 
 function isPrivilegied() {
   try {
@@ -102,9 +102,8 @@ async function StartInterface() {
       {key: "net.ipv6.conf.all.disable_ipv6", value: 0}
     ]).filter(x => sysctlCurrentRules[x.key] === undefined);
     for (const rule of sysRules) await applySysctl(rule.key, rule.value);
-    if (initLoad) {
-      child_process.spawnSync("wg syncconf wg0 <(wg-quick strip wg0)", {stdio: "inherit", encoding: "utf8"});
-    } else {
+    if (initLoad) child_process.spawnSync("wg syncconf wg0 <(wg-quick strip wg0)", {stdio: "inherit", encoding: "utf8"});
+    else {
       if (!!NetInterfaces.find(x => x.interface === "wg0")) downWgQuick("wg0");
       child_process.execFileSync("wg-quick", ["up", "wg0"], {stdio: "inherit"});
       initLoad = true;
@@ -113,21 +112,45 @@ async function StartInterface() {
   } else console.error("Docker is not privilegied");
 }
 
-process.on("SIGINT", () => {
+(["exit", "SIGINT"]).forEach(x => process.on(x, () => {
   console.log("\nShutting down...");
   if (isPrivilegied()) {
     child_process.execFileSync("wg-quick", ["down", "wg0"], {stdio: "inherit", maxBuffer: Infinity});
     console.log("Wireguard Interface is down");
   }
   process.exit(0);
-});
+}));
 
-export async function writeWireguardConfig(config: types.wireConfigInput): Promise<void>{
-  if (config.users.length === 0) {
+function convert_ipv4_to_ipv6(ipV4 = ""){
+  const hexaCode = (hexaVal: number)=>{
+    if (hexaVal === 10) return "A";
+    else if (hexaVal === 11) return "B";
+    else if (hexaVal === 12) return "C";
+    else if (hexaVal === 13) return "D";
+    else if (hexaVal === 14) return "E";
+    else if (hexaVal === 15) return "F";
+    else return hexaVal;
+  }
+  const classValues = ipV4.split(".");
+  if(classValues.length){
+    const str = classValues.reduce((acc, val, ind) => {
+      const mod = +val >= 16 ? +val%16 : +val;
+      const divider = +val >= 16 ? (parseFloat(val)-mod)/16 : 0;
+      const modRes = hexaCode(mod);
+      const dividerRes = hexaCode(divider);
+      return ind === 1 ? `${acc}${dividerRes}${modRes}:`:`${acc}${dividerRes}${modRes}`;
+    }, "");
+    return `2002:${str}::`;
+  }
+  throw "Invalid Address";
+}
+
+export async function writeWireguardConfig(config: {ServerKeys: {Preshared: string, Private: string, Public: string}, Users: Array<wireguardType>}): Promise<void>{
+  if (config.Users.length === 0) {
     console.error("No users");
     return;
   }
-  const {users, WireguardIpConfig} = config;
+  const {Users, ServerKeys} = config;
   const NetInterfaces = networkInterfaces();
   const PostUp = [
     `iptables -A FORWARD -i ${NetInterfaces[0].interface} -o wg0 -j ACCEPT`,
@@ -144,29 +167,41 @@ export async function writeWireguardConfig(config: types.wireConfigInput): Promi
     `ip6tables -t nat -D POSTROUTING -o ${NetInterfaces[0].interface} -j MASQUERADE`
   ];
 
-  const configFile: {Server: string; peers: Array<{Username: string, config: string;}>;} = {
-    Server:  ([
+  const ipServer: Array<{v4: {ip: string, mask: string}, v6: {ip: string, mask: string}}> = [];
+  for (const {Keys} of Users) {
+    for (const {ip} of Keys) {
+      const { v4, v6 } = ip;
+      const [ip1, ip2, ip3] = v4.ip.split(".");
+      const vv4 = `${ip1}.${ip2}.${ip3}.1`;
+      if (!(ipServer.find(x => x.v4.ip === vv4))) {
+        const vv6 = convert_ipv4_to_ipv6(vv4);
+        ipServer.push({v4: {ip: vv4, mask: v4.mask}, v6: {ip: vv6, mask: v6.mask}});
+      }
+    }
+  }
+
+  const configFile: {Server: string; peers: Array<{UserId: string, config: string;}>;} = {
+    Server: ([
       "[Interface]",
       "ListenPort = 51820",
       "SaveConfig = true",
-      ...WireguardIpConfig.ip.map(a => `Address = ${a.v4.ip}/${a.v4.mask}, ${a.v6.ip}/${a.v6.mask}`),
-      `PrivateKey = ${WireguardIpConfig.keys.Private}`,
+      `PrivateKey = ${ServerKeys.Private}`,
       ...PostUp.map(Rule => `PostUp = ${Rule}`),
-      ...PostDown.map(Rule => `PostDown = ${Rule}`)
+      ...PostDown.map(Rule => `PostDown = ${Rule}`),
+      ...ipServer.map(a => `Address = ${a.v4.ip}/${a.v4.mask}, ${a.v6.ip}/${a.v6.mask}`),
     ]).join("\n"),
     peers: []
   }
-  for (let User of users) {
-    const { wireguard, username } = User;
-    if (wireguard.length > 0) {
-      for (const Peer of wireguard) {
+  for (const {UserId, Keys} of Users) {
+    if (Keys.length > 0) {
+      for (const {ip, keys} of Keys) {
         configFile.peers.push({
-          Username: username,
+          UserId: UserId,
           config: ([
             `[Peer]`,
-            `PublicKey = ${Peer.keys.Public}`,
-            `PresharedKey = ${Peer.keys.Preshared}`,
-            `AllowedIPs = ${Peer.ip.v4.ip}/${Peer.ip.v4.mask}, ${Peer.ip.v6.ip}/${Peer.ip.v6.mask}`
+            `PublicKey = ${keys.Public}`,
+            `PresharedKey = ${keys.Preshared}`,
+            `AllowedIPs = ${ip.v4.ip}/${ip.v4.mask}, ${ip.v6.ip}/${ip.v6.mask}`
           ]).join("\n")
         });
       }
@@ -176,7 +211,7 @@ export async function writeWireguardConfig(config: types.wireConfigInput): Promi
   for (let PeerIndex in configFile.peers) {
     const Peer = configFile.peers[PeerIndex];
     fs.appendFileSync(path.join("/etc/wireguard/wg0.conf"), "\n\n");
-    fs.appendFileSync(path.join("/etc/wireguard/wg0.conf"), `### ${Peer.Username}: ${PeerIndex}\n`);
+    fs.appendFileSync(path.join("/etc/wireguard/wg0.conf"), `### ${Peer.UserId}: ${PeerIndex}\n`);
     fs.appendFileSync(path.join("/etc/wireguard/wg0.conf"), Peer.config);
   }
   await StartInterface();

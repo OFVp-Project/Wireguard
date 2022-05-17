@@ -1,6 +1,6 @@
 FROM debian:latest as server
 LABEL org.opencontainers.image.title="OFVp Wireguard"
-LABEL org.opencontainers.image.description="Main docker image to maneger anothers docker images."
+LABEL org.opencontainers.image.description="Docker image with Wireguard Connection and Maneger"
 LABEL org.opencontainers.image.vendor="ofvp_project"
 LABEL org.opencontainers.image.licenses="GPL-3.0-or-later"
 LABEL org.opencontainers.image.source="https://github.com/OFVp-Project/Wireguard"
@@ -16,9 +16,8 @@ RUN VERSION=$(wget -qO- https://api.github.com/repos/Sirherobrine23/DebianNodejs
 RUN apt update && apt install -y dkms wireguard net-tools iproute2 iptables systemctl
 
 # Setup Project
-ENV DAEMON_PASSWORD=""
-ENV DAEMON_USER=""
-ENV DAEMON_HOST="http://localhost:5000"
+ENV DAEMON_PASSWORD="" DAEMON_USER="" DAEMON_HOST="http://localhost:5000"
+ENV MongoDB_URL="mongodb://localhost:27017/OFVpServer"
 EXPOSE 51820:51820/udp
 WORKDIR /app
 ENTRYPOINT [ "node", "--trace-warnings", "dist/index.js" ]
