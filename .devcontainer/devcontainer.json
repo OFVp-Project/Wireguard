@@ -1,22 +1,25 @@
 {
-  "name": "ofvp_wireguard",
-  "dockerFile": "Dockerfile",
+  "name": "OFVp Daemon Maneger",
   "updateRemoteUserUID": false,
-  "containerUser": "gitpod",
-  "remoteUser": "gitpod",
-  "postStartCommand": "screen -dm sudo dockerd",
+  "containerUser": "develop",
+  "remoteUser": "develop",
+  "overrideCommand": false,
+  "postCreateCommand": "npm install",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "args": {
+      "USERNAME": "develop",
+      "USER_UID": "1000"
+    }
+  },
   "runArgs": [
     "--init",
     "--privileged"
   ],
   "mounts": [
-    "source=ofvp_project_dind,target=/var/lib/docker,type=volume"
-  ],
-  "forwardPorts": [
-    3000
+    "target=/var/lib/docker,type=volume,source=ofvp_project_daemon"
   ],
   "extensions": [
-    "github.copilot",
     "redhat.vscode-yaml",
     "akamud.vscode-theme-onedark",
     "hookyqr.beautify",
@@ -39,6 +42,15 @@
     "eamodio.gitlens",
     "mongodb.mongodb-vscode",
     "ms-azuretools.vscode-docker",
-    "chrmarti.regex"
-  ]
+    "chrmarti.regex",
+    "formulahendry.code-runner",
+    "euskadi31.json-pretty-printer"
+  ],
+  "settings": {
+    "editor.tabSize": 2,
+    "editor.minimap.enabled": false,
+    "files.eol": "\n",
+    "files.trimFinalNewlines": true,
+    "files.trimTrailingWhitespace": true
+  }
 }
