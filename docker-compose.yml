@@ -3,59 +3,54 @@ volumes:
   data_api:
   MongoOFVp:
 networks:
-  ofvp_network:
+  ofvp_project:
+
 services:
-  ofvp_mongodb:
-    container_name: ofvp_mongodb
+  db:
     restart: on-failure
     image: mongo
     volumes:
       - MongoOFVp:/data/db
+    command:
+      - "--bind_ip_all"
+      - "--quiet"
+      - "--logpath"
+      - "/dev/null"
     networks:
-      - "ofvp_network"
-    environment:
-      - PUID=1000
-      - PGID=1000
-    entrypoint:
-    - "mongod"
-    - "--bind_ip_all"
-    - "--quiet"
-    - "--logpath"
-    - "/dev/null"
-
+      - ofvp_project
+    ports:
+      - 27017:27017/tcp
   ofvp_daemon_maneger:
     container_name: ofvp_daemon_maneger
     restart: on-failure
     image: ghcr.io/ofvp-project/deamonmaneger:latest
     depends_on:
-      - ofvp_mongodb
-    networks:
-      - "ofvp_network"
+      - db
     environment:
       NODE_ENV: "development"
-      MongoDB_URL: "mongodb://ofvp_mongodb:27017"
-      COOKIE_SECRET: "dev"
+      MongoDB_URL: "mongodb://db"
       PASSWORD_ENCRYPT: "dev"
-      DAEMON_PASSWORD: "dev"
-      DAEMON_USER: "dev"
+      COOKIE_SECRET: "dev"
     ports:
       - 3000:3000/tcp
     volumes:
       - data_api:/data
+    networks:
+      - ofvp_project
 
   ofvp_wireguard:
     container_name: ofvp_wireguard
     restart: on-failure
-    image: ghcr.io/ofvp-project/wireguard:latest
     build:
       context: .
       dockerfile: Dockerfile
-    networks:
-      - "ofvp_network"
+    depends_on:
+      - db
     environment:
-      DAEMON_HOST: "http://ofvp_daemon_maneger:5000"
-      DAEMON_PASSWORD: "dev"
-      DAEMON_USER: "dev"
+      NODE_ENV: "development"
+      MongoDB_URL: "mongodb://db"
+      PASSWORD_ENCRYPT: "dev"
+      COOKIE_SECRET: "dev"
     privileged: true
     sysctls:
       net.ipv4.conf.all.src_valid_mark: 1
@@ -66,5 +61,5 @@ services:
       - /lib/modules/:/lib/modules/:ro
     ports:
       - 51820:51820/udp
-    depends_on:
-      - ofvp_daemon_maneger
+    networks:
+      - ofvp_project

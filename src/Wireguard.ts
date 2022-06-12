@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-import * as child_process from "child_process";
-import * as os from "os";
-import * as path from "path";
-import fs, {promises as fsPromise} from "fs";
-import { wireguardType } from "./types";
+import * as child_process from "node:child_process";
+import * as os from "node:os";
+import * as path from "node:path";
+import * as fs from "node:fs/promises";
+import * as oldFs from "node:fs";
 
 function isPrivilegied() {
   try {
@@ -51,16 +51,16 @@ function networkInterfaces() {
 async function getSysctl(): Promise<{[x: string]: string|number|Array<number|string>}> {
   const Sysctl = {};
   await new Promise(async resolve => {
-    if (fs.existsSync("/etc/sysctl.conf")) {
-      await fsPromise.readFile("/etc/sysctl.conf", "utf8").then(async data => {
-        for (const line of data.replace(/\r\n/gi, "\n").split("\n")) {
+    if (oldFs.existsSync("/etc/sysctl.conf")) {
+      await fs.readFile("/etc/sysctl.conf", "utf8").then(async data => {
+        for (const line of data.split(/\r?\n/gi)) {
           const match = line.match(/(.*)=(.*)/);
           if (match) Sysctl[match[1].trim()] = match[2].trim();
         }
       }).catch(() => {});
-      if (fs.existsSync("/etc/sysctl.d")) await fsPromise.readdir("/etc/sysctl.d").then(async files => {
+      if (oldFs.existsSync("/etc/sysctl.d")) await fs.readdir("/etc/sysctl.d").then(async files => {
         for (const file of files) {
-          const data = await fsPromise.readFile(path.join("/etc/sysctl.d", file), "utf8");
+          const data = await fs.readFile(path.join("/etc/sysctl.d", file), "utf8");
           for (const line of data.replace(/\r\n/gi, "\n").split("\n")) {
             const match = line.match(/(.*)=(.*)/);
             if (match) Sysctl[match[1].trim()] = match[2].trim();
@@ -78,12 +78,12 @@ async function getSysctl(): Promise<{[x: string]: string|number|Array<number|str
   return Sysctl;
 }
 
-async function applySysctl(key, value) {
+async function applySysctl(key: string, value: string|number) {
   const Sysctl = await getSysctl();
   if (Sysctl[key] === undefined) {
-    if (!(fs.existsSync("/etc/sysctl.d"))) await fsPromise.mkdir("/etc/sysctl.d", {recursive: true});
-    if (fs.existsSync("/etc/sysctl.d/ofvp.conf")) fs.appendFileSync("/etc/sysctl.d/ofvp.conf", `\n${key} = ${value}`);
-    else await fsPromise.writeFile("/etc/sysctl.d/ofvp.conf", `${key} = ${value}`, {encoding: "utf8"});
+    if (!(oldFs.existsSync("/etc/sysctl.d"))) await fs.mkdir("/etc/sysctl.d", {recursive: true});
+    if (oldFs.existsSync("/etc/sysctl.d/ofvp.conf")) await fs.appendFile("/etc/sysctl.d/ofvp.conf", `\n${key} = ${value}`);
+    else await fs.writeFile("/etc/sysctl.d/ofvp.conf", `${key} = ${value}`, {encoding: "utf8"});
     child_process.execSync("sysctl --system", {stdio: "pipe"});
     return;
   }
@@ -112,17 +112,8 @@ async function StartInterface() {
   } else console.error("Docker is not privilegied");
 }
 
-(["exit", "SIGINT"]).forEach(x => process.on(x, () => {
-  console.log("\nShutting down...");
-  if (isPrivilegied()) {
-    child_process.execFileSync("wg-quick", ["down", "wg0"], {stdio: "inherit", maxBuffer: Infinity});
-    console.log("Wireguard Interface is down");
-  }
-  process.exit(0);
-}));
-
-function convert_ipv4_to_ipv6(ipV4 = ""){
-  const hexaCode = (hexaVal: number)=>{
+function ConvertIPv4ToIPv6(ipV4: string){
+  const hexaCode = (hexaVal: number): string|number => {
     if (hexaVal === 10) return "A";
     else if (hexaVal === 11) return "B";
     else if (hexaVal === 12) return "C";
@@ -132,18 +123,33 @@ function convert_ipv4_to_ipv6(ipV4 = ""){
     else return hexaVal;
   }
   const classValues = ipV4.split(".");
-  if(classValues.length){
-    const str = classValues.reduce((acc, val, ind) => {
-      const mod = +val >= 16 ? +val%16 : +val;
-      const divider = +val >= 16 ? (parseFloat(val)-mod)/16 : 0;
+  if(classValues.length === 4){
+    const ipv6 = classValues.reduce((acc, val, ind) => {
+      const mod = (+val >= 16) ? (+val % 16) : +val;
       const modRes = hexaCode(mod);
-      const dividerRes = hexaCode(divider);
+      const dividerRes = hexaCode((+val >= 16) ? (parseFloat(val) - mod) / 16 : 0);
       return ind === 1 ? `${acc}${dividerRes}${modRes}:`:`${acc}${dividerRes}${modRes}`;
     }, "");
-    return `2002:${str}::`;
+    if (/NaN/.test(ipv6)) throw new Error("Invalid IPv4 address");
+    return `2002:${ipv6}::`;
   }
   throw "Invalid Address";
 }
+
+export type wireguardType = {
+  UserId: string,
+  Keys: Array<{
+    keys: {
+      Preshared: string,
+      Private: string,
+      Public: string
+    },
+    ip: {
+      v4: {ip: string, mask: string},
+      v6: {ip: string, mask: string}
+    }
+  }>
+};
 
 export async function writeWireguardConfig(config: {ServerKeys: {Preshared: string, Private: string, Public: string}, Users: Array<wireguardType>}): Promise<void>{
   if (config.Users.length === 0) {
@@ -174,46 +180,48 @@ export async function writeWireguardConfig(config: {ServerKeys: {Preshared: stri
       const [ip1, ip2, ip3] = v4.ip.split(".");
       const vv4 = `${ip1}.${ip2}.${ip3}.1`;
       if (!(ipServer.find(x => x.v4.ip === vv4))) {
-        const vv6 = convert_ipv4_to_ipv6(vv4);
+        const vv6 = ConvertIPv4ToIPv6(vv4);
         ipServer.push({v4: {ip: vv4, mask: v4.mask}, v6: {ip: vv6, mask: v6.mask}});
       }
     }
   }
 
-  const configFile: {Server: string; peers: Array<{UserId: string, config: string;}>;} = {
-    Server: ([
-      "[Interface]",
-      "ListenPort = 51820",
-      "SaveConfig = true",
-      `PrivateKey = ${ServerKeys.Private}`,
-      ...PostUp.map(Rule => `PostUp = ${Rule}`),
-      ...PostDown.map(Rule => `PostDown = ${Rule}`),
-      ...ipServer.map(a => `Address = ${a.v4.ip}/${a.v4.mask}, ${a.v6.ip}/${a.v6.mask}`),
-    ]).join("\n"),
-    peers: []
-  }
+  // Write Wireguard Interface Config
+  await fs.writeFile(path.join("/etc/wireguard/wg0.conf"), ([
+    "[Interface]", "ListenPort = 51820", "SaveConfig = true",
+    `PostUp = ${PostUp.join(";")}`, `PostDown = ${PostDown.join(";")}`, // Iptables rules
+    `Address = ${ipServer.map(a => `${a.v4.ip}/${a.v4.mask}, ${a.v6.ip}/${a.v6.mask}`).join(", ").trim()}`, // Server IPs
+    `PrivateKey = ${ServerKeys.Private}` // Server Private Key
+  ]).join("\n"));
+
+  // Write Peer config for users
   for (const {UserId, Keys} of Users) {
     if (Keys.length > 0) {
-      for (const {ip, keys} of Keys) {
-        configFile.peers.push({
-          UserId: UserId,
-          config: ([
-            `[Peer]`,
-            `PublicKey = ${keys.Public}`,
-            `PresharedKey = ${keys.Preshared}`,
-            `AllowedIPs = ${ip.v4.ip}/${ip.v4.mask}, ${ip.v6.ip}/${ip.v6.mask}`
-          ]).join("\n")
-        });
+      for (const PeerIndex in Keys) {
+        const {ip, keys} = Keys[PeerIndex];
+        let peerConfig = `\n\n### ${UserId}: ${PeerIndex}\n`;
+        peerConfig += ([
+          `[Peer]`,
+          `PublicKey = ${keys.Public}`,
+          `PresharedKey = ${keys.Preshared}`,
+          `AllowedIPs = ${ip.v4.ip}/${ip.v4.mask}, ${ip.v6.ip}/${ip.v6.mask}`
+        ]).join("\n");
+        // Write to Wireguard server config
+        await fs.appendFile(path.join("/etc/wireguard/wg0.conf"), peerConfig);
       }
     }
-  }
-  fs.writeFileSync(path.join("/etc/wireguard/wg0.conf"), configFile.Server);
-  for (let PeerIndex in configFile.peers) {
-    const Peer = configFile.peers[PeerIndex];
-    fs.appendFileSync(path.join("/etc/wireguard/wg0.conf"), "\n\n");
-    fs.appendFileSync(path.join("/etc/wireguard/wg0.conf"), `### ${Peer.UserId}: ${PeerIndex}\n`);
-    fs.appendFileSync(path.join("/etc/wireguard/wg0.conf"), Peer.config);
   }
   await StartInterface();
   return;
 }
+
+(["exit", "SIGINT"]).forEach(x => process.on(x, () => {
+  console.log("\nShutting down...");
+  if (isPrivilegied()) {
+    if (oldFs.existsSync("/etc/wireguard/wg0.conf")) {
+      child_process.execFileSync("wg-quick", ["down", "wg0"], {stdio: "inherit", maxBuffer: Infinity});
+      console.log("Wireguard Interface is down");
+    }
+  }
+  process.exit(0);
+}));

@@ -1,14 +1,13 @@
 import mongoose from "mongoose";
 import axios from "axios";
 import * as Wireguard from "./Wireguard";
-import { wireguardType } from "./types";
 
 let { MongoDB_URL, DAEMON_PASSWORD, DAEMON_USER, DAEMON_HOST } = process.env;
 if (!MongoDB_URL) MongoDB_URL = "mongodb://localhost:27017";
 if (!/:\/\/.*\//.test(MongoDB_URL)) MongoDB_URL = MongoDB_URL+"/OFVpServer";
 mongoose.connect(MongoDB_URL);
 
-const WireguardSchema = mongoose.model<wireguardType>("Wireguard", new mongoose.Schema<wireguardType>({
+const WireguardSchema = mongoose.model<Wireguard.wireguardType>("Wireguard", new mongoose.Schema<Wireguard.wireguardType>({
   UserId: {
     type: String,
     required: true,
