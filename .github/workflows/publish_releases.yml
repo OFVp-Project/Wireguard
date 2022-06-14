@@ -5,7 +5,7 @@ on:
       - created
 
 env:
-  DOCKERPLATFORM: "linux/amd64,linux/arm64,linux/s390x"
+  DOCKERPLATFORM: "linux/amd64,linux/arm64"
   DOCKERIMAGE: "ghcr.io/ofvp-project/wireguard"
 
 jobs:
@@ -41,7 +41,6 @@ jobs:
         with:
           context: .
           push: true
-          target: server
           tags: ${{ env.DOCKERIMAGE }}:${{ env.PACKAGE_VERSION }}
           platforms: ${{ env.DOCKERPLATFORM }}
           cache-from: type=gha,scope=${{ github.ref }}_${{ hashFiles('**/package-lock.json') }}

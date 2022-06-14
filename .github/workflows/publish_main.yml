@@ -14,7 +14,6 @@ jobs:
     name: Publish latest
     environment:
       name: Docker_Latest
-      url: "ghcr.io/ofvp-project/wireguard"
     steps:
       - uses: actions/checkout@v3
         with:
@@ -38,7 +37,6 @@ jobs:
         with:
           context: .
           push: true
-          target: server
           tags: "${{ env.DOCKERIMAGE }}:latest"
           platforms: ${{ env.DOCKERPLATFORM }}
           cache-from: type=gha,scope=${{ github.ref }}_${{ hashFiles('**/package-lock.json') }}
