@@ -20,8 +20,6 @@
     "url": "https://github.com/OFVp-Project/Wireguard/issues"
   },
   "dependencies": {
-    "axios": "^0.27.2",
-    "mongoose": "^6.3.6",
     "socket.io-client": "^4.5.1",
     "typescript": "^4.7.3"
   },

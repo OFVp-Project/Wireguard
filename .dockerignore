@@ -1,1 +1,8 @@
 node_modules/
+.vscode/
+.github/
+.devcontainer/
+.git/
+.gitpod.yml
+docker-compose.y*ml
+Dockerfile

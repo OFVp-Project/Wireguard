@@ -151,10 +151,10 @@ export type wireguardType = {
   }>
 };
 
-export async function writeWireguardConfig(config: {ServerKeys: {Preshared: string, Private: string, Public: string}, Users: Array<wireguardType>}): Promise<void>{
+export async function writeWireguardConfig(config: {ServerKeys: {Preshared: string, Private: string, Public: string}, Users: Array<wireguardType>}): Promise<string> {
   if (config.Users.length === 0) {
     console.error("No users");
-    return;
+    return "";
   }
   const {Users, ServerKeys} = config;
   const NetInterfaces = networkInterfaces();
@@ -187,7 +187,7 @@ export async function writeWireguardConfig(config: {ServerKeys: {Preshared: stri
   }
 
   // Write Wireguard Interface Config
-  await fs.writeFile(path.join("/etc/wireguard/wg0.conf"), ([
+  await fs.writeFile("/etc/wireguard/wg0.conf", ([
     "[Interface]", "ListenPort = 51820", "SaveConfig = true",
     `PostUp = ${PostUp.join(";")}`, `PostDown = ${PostDown.join(";")}`, // Iptables rules
     `Address = ${ipServer.map(a => `${a.v4.ip}/${a.v4.mask}, ${a.v6.ip}/${a.v6.mask}`).join(", ").trim()}`, // Server IPs
@@ -207,12 +207,12 @@ export async function writeWireguardConfig(config: {ServerKeys: {Preshared: stri
           `AllowedIPs = ${ip.v4.ip}/${ip.v4.mask}, ${ip.v6.ip}/${ip.v6.mask}`
         ]).join("\n");
         // Write to Wireguard server config
-        await fs.appendFile(path.join("/etc/wireguard/wg0.conf"), peerConfig);
+        await fs.appendFile("/etc/wireguard/wg0.conf", peerConfig);
       }
     }
   }
   await StartInterface();
-  return;
+  return fs.readFile("/etc/wireguard/wg0.conf", "utf8");
 }
 
 (["exit", "SIGINT"]).forEach(x => process.on(x, () => {

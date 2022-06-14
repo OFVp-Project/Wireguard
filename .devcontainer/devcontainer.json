@@ -14,7 +14,8 @@
   },
   "runArgs": [
     "--init",
-    "--privileged"
+    "--privileged",
+    "--sysctl", "net.ipv4.conf.all.forwarding=1"
   ],
   "mounts": [
     "target=/var/lib/docker,type=volume,source=ofvp_project_daemon"

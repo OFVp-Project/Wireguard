@@ -1,78 +1,47 @@
-import mongoose from "mongoose";
-import axios from "axios";
+#!/usr/bin/env node
 import * as Wireguard from "./Wireguard";
+import { io as socketIO } from "socket.io-client";
+console.log("Starting...");
+const { DAEMON_HOST, DAEMON_USERNAME, DAEMON_PASSWORD } = process.env;
+if (!DAEMON_HOST) {
+  console.log("Daemon host not defined");
+  process.exit(1);
+}
+const io = socketIO(DAEMON_HOST, {
+  auth: {
+    username: DAEMON_USERNAME,
+    password: DAEMON_PASSWORD
+  }
+});
 
-let { MongoDB_URL, DAEMON_PASSWORD, DAEMON_USER, DAEMON_HOST } = process.env;
-if (!MongoDB_URL) MongoDB_URL = "mongodb://localhost:27017";
-if (!/:\/\/.*\//.test(MongoDB_URL)) MongoDB_URL = MongoDB_URL+"/OFVpServer";
-mongoose.connect(MongoDB_URL);
+function getServerConfig(): Promise<Wireguard.wireguardType["Keys"][0]["keys"]> {
+  return new Promise((resolve) => {
+    // "wireguardServerConfig"
+    io.once("wireguardServerConfig", data => resolve(data));
+    io.emit("wireguardServerConfig", "ok");
+  });
+}
 
-const WireguardSchema = mongoose.model<Wireguard.wireguardType>("Wireguard", new mongoose.Schema<Wireguard.wireguardType>({
-  UserId: {
-    type: String,
-    required: true,
-    unique: true
-  },
-  Keys: [
-    {
-      keys: {
-        Preshared: {
-          type: String,
-          unique: true,
-          required: true
-        },
-        Private: {
-          type: String,
-          unique: true,
-          required: true
-        },
-        Public: {
-          type: String,
-          unique: true,
-          required: true
-        }
-      },
-      ip: {
-        v4: {
-          ip: {
-            type: String,
-            unique: true,
-            required: true
-          },
-          mask: {
-            type: String,
-            required: true
-          }
-        },
-        v6: {
-          ip: {
-            type: String,
-            unique: true,
-            required: true
-          },
-          mask: {
-            type: String,
-            required: true
-          }
-        }
-      }
-    }
-  ]
-}));
+function getUsers(): Promise<Array<Wireguard.wireguardType>> {
+  return new Promise((resolve) => {
+    // "wireguardUsers"
+    io.once("wireguardUsers", data => resolve(data));
+    io.emit("wireguardUsers", "ok");
+  });
+}
 
-mongoose.connection.once("connected", () => {
-  return axios.get(`${DAEMON_HOST}/wginternal`, {headers: {daemon_user: DAEMON_USER, daemon_pass: DAEMON_PASSWORD}}).then(({data}) => {
-    const __UpdateConfig = () => WireguardSchema.find().lean().then(users => Wireguard.writeWireguardConfig({
-      ServerKeys: data,
+//Close connection exit process
+io.once("disconnect", () => {
+  console.log("Disconnected, ending process");
+  process.exit(0);
+});
+io.once("connect", () => {
+  getServerConfig().then(serverConfig => {
+    const __UpdateConfig = () => getUsers().then(users => Wireguard.writeWireguardConfig({
+      ServerKeys: serverConfig,
       Users: users
     }));
     const Update = (call: (...any) => any) => __UpdateConfig().then(() => new Promise(resolve => setTimeout(resolve, 1000))).then(call);
     return Update(Update);
-  })
-});
-
-// Close connection exit process
-mongoose.connection.once("disconnected", () => {
-  console.log("MongoDB disconnected, ending process");
-  process.exit(0);
+  });
 });
