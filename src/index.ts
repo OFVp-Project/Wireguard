@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import * as Wireguard from "./Wireguard";
+import * as backend from "./backend";
 import { io as socketIO } from "socket.io-client";
 console.log("Starting...");
 const { DAEMON_HOST, DAEMON_USERNAME, DAEMON_PASSWORD } = process.env;
@@ -8,10 +9,9 @@ if (!DAEMON_HOST) {
   process.exit(1);
 }
 const io = socketIO(DAEMON_HOST, {
-  auth: {
-    username: DAEMON_USERNAME,
-    password: DAEMON_PASSWORD
-  }
+  transports: ["websocket", "polling"],
+  auth: {username: DAEMON_USERNAME, password: DAEMON_PASSWORD},
+  extraHeaders: {username: DAEMON_USERNAME, password: DAEMON_PASSWORD}
 });
 
 function getServerConfig(): Promise<Wireguard.wireguardType["Keys"][0]["keys"]> {
@@ -30,18 +30,17 @@ function getUsers(): Promise<Array<Wireguard.wireguardType>> {
   });
 }
 
+io.once("connect", () => backend.isPrivilegied().then(async isPrivileged => {
+  if (!isPrivileged) {
+    console.error("Docker is not privilegied");
+    process.exit(1);
+  }
+  const __UpdateConfig = (serverConfig: Wireguard.wireguardType["Keys"][number]["keys"]) => getUsers().then(users => Wireguard.writeWireguardConfig({
+    ServerKeys: serverConfig,
+    Users: users
+  }));
+  while (true) await getServerConfig().then(__UpdateConfig).then(() => new Promise(resolve => setTimeout(resolve, 1000)));
+}));
+
 //Close connection exit process
-io.once("disconnect", () => {
-  console.log("Disconnected, ending process");
-  process.exit(0);
-});
-io.once("connect", () => {
-  getServerConfig().then(serverConfig => {
-    const __UpdateConfig = () => getUsers().then(users => Wireguard.writeWireguardConfig({
-      ServerKeys: serverConfig,
-      Users: users
-    }));
-    const Update = (call: (...any) => any) => __UpdateConfig().then(() => new Promise(resolve => setTimeout(resolve, 1000))).then(call);
-    return Update(Update);
-  });
-});
+io.once("disconnect", () => {console.log("Disconnected from daemon, ending process"); return Wireguard.shutdownWireguard();});

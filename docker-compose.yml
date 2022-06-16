@@ -1,58 +1,66 @@
 version: "3.9"
-volumes:
-  data_api:
-  MongoOFVp:
 networks:
-  ofvp_project:
-    name: ofvpNetwork
+  defaultOfvpNetwork:
+volumes:
+  mongoStorage:
+  sshStorage:
 
 services:
-  mongo:
+  mongodb:
     image: mongo
-    restart: on-failure
-    hostname: mongo_container.local
-    volumes:
-      - MongoOFVp:/data/db
-    command: "--quiet --port 27017 --nounixsocket --bind_ip_all --noauth"
-    ports:
-      - 27017:27017/tcp
-  daemon:
-    restart: on-failure
+    restart: always
+    command: "--bind_ip_all --port 27017 --noauth --quiet --logpath /dev/null"
+    networks: [defaultOfvpNetwork]
+    volumes: [mongoStorage:/data/db]
+  ofvpmaneger:
     image: ghcr.io/ofvp-project/deamonmaneger:next
-    hostname: ofvp-daemon.local
+    ports: [3000:3000/tcp]
+    networks: [defaultOfvpNetwork]
+    depends_on: [mongodb]
     environment:
       NODE_ENV: "development"
-      MONGO_URL: "mongodb://mongo"
+      MongoDB_URL: "mongodb://mongodb:27017/ofvp"
       PASSWORD_ENCRYPT: "dev"
       COOKIE_SECRET: "dev"
-    ports:
-      - 3000:3000/tcp
-    volumes:
-      - data_api:/data
-    depends_on:
-      - mongo
-    links:
-      - "mongo"
-
-  wireguard:
-    restart: on-failure
-    privileged: true
-    build:
-      dockerfile: Dockerfile
-    environment:
-      DAEMON_HOST: "http://daemon:5000"
       DAEMON_USERNAME: ""
       DAEMON_PASSWORD: ""
+
+  ssh:
+    image: ghcr.io/ofvp-project/ssh-server:next
+    restart: always
+    depends_on: [ofvpmaneger]
+    networks: [defaultOfvpNetwork]
+    ports: [2222:22/tcp]
+    volumes: [sshStorage:/data]
+    environment:
+      PASSWORD_ENCRYPT: "dev"
+      NODE_ENV: "development"
+      DAEMON_HOST: "http://ofvpmaneger:5000"
+      DAEMON_USERNAME: ""
+      DAEMON_PASSWORD: ""
+
+  webproxy:
+    image: ghcr.io/ofvp-project/webproxy:latest
+    restart: always
+    depends_on: [ssh]
+    networks: [defaultOfvpNetwork]
+    ports: [8080:80/tcp]
+    command: "-l 2 --ssh ssh:22"
+
+  wireguard:
+    build: ./
+    restart: always
+    depends_on: [ofvpmaneger]
+    networks: [defaultOfvpNetwork]
+    volumes: [/lib/modules/:/lib/modules/:ro]
+    ports: [51820:51820/udp]
+    privileged: true
     sysctls:
       net.ipv4.conf.all.src_valid_mark: 1
       net.ipv6.conf.all.disable_ipv6: 0
       net.ipv6.conf.all.forwarding: 1
       net.ipv4.ip_forward: 1
-    volumes:
-      - /lib/modules/:/lib/modules/:ro
-    ports:
-      - 51820:51820/udp
-    depends_on:
-      - daemon
-    links:
-      - "daemon"
+    environment:
+      DAEMON_HOST: "http://ofvpmaneger:5000"
+      DAEMON_USERNAME: ""
+      DAEMON_PASSWORD: ""
