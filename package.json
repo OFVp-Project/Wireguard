@@ -1,6 +1,6 @@
 {
   "name": "@ofvp_project/wireguard",
-  "version": "4.1.0",
+  "version": "5.0.1",
   "description": "One of the project servers, this server to create a vpn using the Wireguard protocol, which works on several devices.",
   "main": "src/index.js",
   "author": "ofvp_project",
