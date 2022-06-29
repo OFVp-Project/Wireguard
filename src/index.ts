@@ -2,16 +2,21 @@
 import * as Wireguard from "./Wireguard";
 import * as backend from "./backend";
 import { io as socketIO } from "socket.io-client";
-console.log("Starting...");
 const { DAEMON_HOST, DAEMON_USERNAME, DAEMON_PASSWORD } = process.env;
 if (!DAEMON_HOST) {
   console.log("Daemon host not defined");
   process.exit(1);
 }
+console.log("Starting daemon connection on %s...", DAEMON_HOST);
 const io = socketIO(DAEMON_HOST, {
   transports: ["websocket", "polling"],
   auth: {username: DAEMON_USERNAME, password: DAEMON_PASSWORD},
-  extraHeaders: {username: DAEMON_USERNAME, password: DAEMON_PASSWORD}
+  extraHeaders: {username: DAEMON_USERNAME, password: DAEMON_PASSWORD, group: "ssh"},
+  query: {group: "wireguard"}
+});
+io.on("connect_error", err => {
+  console.error(String(err));
+  process.exit(1);
 });
 
 function getServerConfig(): Promise<Wireguard.wireguardType["Keys"][0]["keys"]> {
@@ -41,6 +46,3 @@ io.once("connect", () => backend.isPrivilegied().then(async isPrivileged => {
   }));
   while (true) await getServerConfig().then(__UpdateConfig).then(() => new Promise(resolve => setTimeout(resolve, 1000)));
 }));
-
-//Close connection exit process
-io.once("disconnect", () => {console.log("Disconnected from daemon, ending process"); return Wireguard.shutdownWireguard();});
