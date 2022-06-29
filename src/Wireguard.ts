@@ -92,7 +92,7 @@ export async function writeWireguardConfig(config: {ServerKeys: {Preshared: stri
     `PrivateKey = ${ServerKeys.Private}`,
     // Iptables rules
     `PostUp = iptables -A FORWARD -i ${ethIface} -o wg0 -j ACCEPT; iptables -A FORWARD -i wg0 -j ACCEPT; iptables -t nat -A POSTROUTING -o ${ethIface} -j MASQUERADE; ip6tables -A FORWARD -i wg0 -j ACCEPT; ip6tables -t nat -A POSTROUTING -o ${ethIface} -j MASQUERADE`,
-    `PostDown = iptables -D FORWARD -i ${ethIface} -o wg0 -j ACCEPT; iptables -D FORWARD -i wg0 -j ACCEPT; iptables -t nat -D POSTROUTING -o ${ethIface} -j MASQUERADE; ip6tables -D FORWARD -i wg0 -j ACCEPT; ip6tables -t nat -D POSTROUTING -o ${ethIface} -j MASQUERADE`
+    `PostDown = iptables -D FORWARD -i ${ethIface} -o wg0 -j ACCEPT; iptables -D FORWARD -i wg0 -j ACCEPT; iptables -t nat -D POSTROUTING -o ${ethIface} -j MASQUERADE; ip6tables -D FORWARD -i wg0 -j ACCEPT; ip6tables -t nat -D POSTROUTING -o ${ethIface} -j MASQUERADE`,
     // Server IPs
     `Address = ${ipServer.map(a => `${a.v4.ip}/${a.v4.mask}, ${a.v6.ip}/${a.v6.mask}`).join(",").trim()}`,
   ]).join("\n"));
