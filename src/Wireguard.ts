@@ -5,10 +5,8 @@ import * as oldFs from "node:fs";
 import { getSysctl, applySysctl, isPrivilegied, networkInterfaces } from "./backend";
 const wgConfig = "/etc/wireguard/wg0.conf";
 let initLoad = false;
-const downWgQuick = (WireguardInterface: string) => (child_process.execFileSync("wg-quick", ["down", WireguardInterface], {stdio: "inherit", maxBuffer: Infinity})).toString("utf8");
 async function StartInterface() {
   if (await isPrivilegied()) {
-    const NetInterfaces = networkInterfaces();
     const sysctlCurrentRules = await getSysctl();
     const sysRules = ([
       {key: "net.ipv4.ip_forward", value: 1},
@@ -18,7 +16,7 @@ async function StartInterface() {
     for (const rule of sysRules) await applySysctl(rule.key, rule.value);
     if (initLoad) child_process.spawnSync("wg syncconf wg0 <(wg-quick strip wg0)", {stdio: "inherit", encoding: "utf8"});
     else {
-      if (!!NetInterfaces.find(x => x.interface === "wg0")) downWgQuick("wg0");
+      if ((networkInterfaces()).some(x => x.interface === "wg0")) child_process.execFileSync("wg-quick", ["down", "wg0"], {stdio: "inherit", maxBuffer: Infinity});
       child_process.execFileSync("wg-quick", ["up", "wg0"], {stdio: "inherit"});
       initLoad = true;
     }
@@ -72,22 +70,6 @@ export async function writeWireguardConfig(config: {ServerKeys: {Preshared: stri
     return "";
   }
   const {Users, ServerKeys} = config;
-  const NetInterfaces = networkInterfaces();
-  const PostUp = [
-    `iptables -A FORWARD -i ${NetInterfaces[0].interface} -o wg0 -j ACCEPT`,
-    `iptables -A FORWARD -i wg0 -j ACCEPT`,
-    `iptables -t nat -A POSTROUTING -o ${NetInterfaces[0].interface} -j MASQUERADE`,
-    `ip6tables -A FORWARD -i wg0 -j ACCEPT`,
-    `ip6tables -t nat -A POSTROUTING -o ${NetInterfaces[0].interface} -j MASQUERADE`
-  ];
-  const PostDown = [
-    `iptables -D FORWARD -i ${NetInterfaces[0].interface} -o wg0 -j ACCEPT`,
-    `iptables -D FORWARD -i wg0 -j ACCEPT`,
-    `iptables -t nat -D POSTROUTING -o ${NetInterfaces[0].interface} -j MASQUERADE`,
-    `ip6tables -D FORWARD -i wg0 -j ACCEPT`,
-    `ip6tables -t nat -D POSTROUTING -o ${NetInterfaces[0].interface} -j MASQUERADE`
-  ];
-
   const ipServer: Array<{v4: {ip: string, mask: string}, v6: {ip: string, mask: string}}> = [];
   for (const {Keys} of Users) {
     for (const {ip} of Keys) {
@@ -100,14 +82,19 @@ export async function writeWireguardConfig(config: {ServerKeys: {Preshared: stri
       }
     }
   }
-
+  
   // Wireguard Interface Config
   if (oldFs.existsSync(wgConfig)) configCache = await fs.readFile(wgConfig, "utf8");
+  const ethIface = (networkInterfaces())[0].interface;
   await fs.writeFile(wgConfig, ([
-    "[Interface]", "ListenPort = 51820", "SaveConfig = true",
-    `PostUp = ${PostUp.join(";")}`, `PostDown = ${PostDown.join(";")}`, // Iptables rules
-    `Address = ${ipServer.map(a => `${a.v4.ip}/${a.v4.mask}, ${a.v6.ip}/${a.v6.mask}`).join(", ").trim()}`, // Server IPs
-    `PrivateKey = ${ServerKeys.Private}` // Server Private Key
+    "[Interface]",
+    "ListenPort = 51820",
+    `PrivateKey = ${ServerKeys.Private}`,
+    // Iptables rules
+    `PostUp = iptables -A FORWARD -i ${ethIface} -o wg0 -j ACCEPT; iptables -A FORWARD -i wg0 -j ACCEPT; iptables -t nat -A POSTROUTING -o ${ethIface} -j MASQUERADE; ip6tables -A FORWARD -i wg0 -j ACCEPT; ip6tables -t nat -A POSTROUTING -o ${ethIface} -j MASQUERADE`,
+    `PostDown = iptables -D FORWARD -i ${ethIface} -o wg0 -j ACCEPT; iptables -D FORWARD -i wg0 -j ACCEPT; iptables -t nat -D POSTROUTING -o ${ethIface} -j MASQUERADE; ip6tables -D FORWARD -i wg0 -j ACCEPT; ip6tables -t nat -D POSTROUTING -o ${ethIface} -j MASQUERADE`
+    // Server IPs
+    `Address = ${ipServer.map(a => `${a.v4.ip}/${a.v4.mask}, ${a.v6.ip}/${a.v6.mask}`).join(",").trim()}`,
   ]).join("\n"));
 
   // Write Peer config for users
@@ -120,7 +107,7 @@ export async function writeWireguardConfig(config: {ServerKeys: {Preshared: stri
           `[Peer]`,
           `PublicKey = ${keys.Public}`,
           `PresharedKey = ${keys.Preshared}`,
-          `AllowedIPs = ${ip.v4.ip}/${ip.v4.mask}, ${ip.v6.ip}/${ip.v6.mask}`
+          `AllowedIPs = ${ip.v4.ip}/${ip.v4.mask},${ip.v6.ip}/${ip.v6.mask}`
         ]).join("\n");
         // Write to Wireguard server config
         await fs.appendFile(wgConfig, peerConfig);
